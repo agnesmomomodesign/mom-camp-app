@@ -128,8 +128,9 @@
     <div id="admin-prompt" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
         <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm space-y-4">
             <h3 class="text-xl font-bold text-red-600">請輸入管理員密碼</h3>
+            <!-- 已將 (888) 從 placeholder 移除 -->
             <p id="prompt-message" class="text-gray-700">您確定要刪除 [姓名] 的報名資料嗎？</p>
-            <input type="password" id="admin-password" placeholder="請輸入三位數密碼 (888)" class="input-field text-center" maxlength="3">
+            <input type="password" id="admin-password" placeholder="請輸入三位數密碼" class="input-field text-center" maxlength="3">
             <div class="flex space-x-3">
                 <button onclick="checkAdminPassword()" class="flex-1 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition">
                     確認刪除
@@ -156,6 +157,7 @@
         // 刪除功能所需的全局變數
         let docIdToDelete = null; 
         let nameToDelete = null;
+        // 密碼仍需要定義在程式碼中以便比對
         const ADMIN_PASSWORD = '888';
 
         // === 這是您正式專案的 Firebase 配置 (已內嵌您提供的金鑰) ===
@@ -178,7 +180,9 @@
         // 輔助函式：顯示訊息
         function displayMessage(text, isError = false) {
             const messageElement = document.getElementById('message');
-            messageElement.textContent = text;
+            // 安全檢查：確保 text 始終是字串，避免 null 錯誤
+            const safeText = String(text || '發生未知錯誤'); 
+            messageElement.textContent = safeText;
             messageElement.style.display = 'block';
             messageElement.className = `text-center mt-4 text-lg font-medium p-3 rounded-lg ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`;
             setTimeout(() => {
@@ -220,7 +224,7 @@
             }
         } catch (error) {
             console.error("Firebase 初始化失敗:", error);
-            document.getElementById('loading-message').textContent = '錯誤: Firebase 初始化失敗。';
+            document.getElementById('loading-message').textContent = `錯誤: Firebase 初始化失敗。(${error.message})`;
             submitBtn.textContent = '初始化失敗';
         }
 
@@ -341,7 +345,9 @@
 
             }, (error) => {
                 console.error("即時資料監聽失敗:", error);
-                container.innerHTML = `<p class="p-6 text-center text-red-500">錯誤: 資料讀取失敗 (${error.message})</p>`;
+                // 錯誤處理確保不會在 null 或 undefined 上呼叫方法
+                const errorMessage = error && error.message ? error.message : "發生未知錯誤";
+                container.innerHTML = `<p class="p-6 text-center text-red-500">錯誤: 資料讀取失敗 (${errorMessage})</p>`;
             });
         }
 
@@ -428,8 +434,11 @@
             const password = document.getElementById('admin-password').value.trim();
             
             if (password === ADMIN_PASSWORD) {
-                hideAdminPrompt();
-                await executeDeleteRegistration(docIdToDelete, nameToDelete);
+                // 在執行刪除前，先鎖定 docId 和 name，再隱藏視窗
+                const id = docIdToDelete;
+                const name = nameToDelete;
+                hideAdminPrompt(); 
+                await executeDeleteRegistration(id, name);
             } else {
                 displayMessage('❌ 管理員密碼錯誤！請重新輸入。', true);
                 document.getElementById('admin-password').value = '';
@@ -449,7 +458,11 @@
                 displayMessage(`✅ 已成功刪除 ${name} 的報名資料。`, false);
             } catch (e) {
                 console.error("刪除 Firestore 錯誤: ", e);
-                displayMessage(`❌ 刪除 ${name} 的報名資料失敗: ${e.message}。請確認您的 Firestore 規則已正確設定。`, true);
+                
+                // 修復錯誤處理：確保錯誤訊息不會在 null 上執行方法
+                const error_message = e && e.message ? e.message : "請確認 Firestore 規則已正確設定 (allow write: if request.auth != null)。";
+                const display_name = name || "該筆資料";
+                displayMessage(`❌ 刪除 ${display_name} 的報名資料失敗: ${error_message}`, true);
             }
         }
         
