@@ -101,9 +101,9 @@
                 </div>
             </div>
 
-            <!-- 提交按鈕 -->
-            <button id="submit-btn" onclick="submitRegistration()" class="w-full py-3 px-4 bg-green-500 text-white text-2xl font-bold rounded-xl shadow-lg hover:bg-green-600 transition duration-200 transform hover:scale-[1.01] active:scale-95">
-                送出報名
+            <!-- 提交按鈕: 預設禁用，直到認證完成 -->
+            <button id="submit-btn" onclick="submitRegistration()" disabled class="w-full py-3 px-4 bg-gray-400 text-white text-2xl font-bold rounded-xl shadow-lg transition duration-200">
+                系統初始化中...
             </button>
             <div id="message" class="text-center mt-4 text-lg font-medium" style="display: none;"></div>
         </div>
@@ -150,6 +150,8 @@
         const appId = firebaseConfig.projectId;
         const collectionPath = `/artifacts/${appId}/public/data/camp_registrations`;
 
+        // 提交按鈕元素
+        const submitBtn = document.getElementById('submit-btn');
 
         // 輔助函式：顯示訊息
         function displayMessage(text, isError = false) {
@@ -175,21 +177,29 @@
                     if (user) {
                         userId = user.uid;
                         document.getElementById('user-id').textContent = userId;
+                        // 認證完成，啟用提交按鈕
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = '送出報名';
+                        submitBtn.className = 'w-full py-3 px-4 bg-green-500 text-white text-2xl font-bold rounded-xl shadow-lg hover:bg-green-600 transition duration-200 transform hover:scale-[1.01] active:scale-95';
+
                         // 認證完成，開始監聽資料庫
                         setupRealtimeListener();
                     } else {
-                        // 在正式部署環境中，如果沒有用戶，就直接使用匿名登入
+                        // 如果沒有用戶，就直接使用匿名登入
                         await signInAnonymously(auth);
+                        // 注意：signInAnonymously會再次觸發onAuthStateChanged，所以啟用按鈕的邏輯在上面處理
                     }
                 });
 
             } else {
                 console.error("錯誤：Firebase 配置遺失。請檢查您的 index.html 是否包含正確的金鑰。");
                 document.getElementById('loading-message').textContent = '錯誤: Firebase 配置遺失，無法載入資料。';
+                submitBtn.textContent = '配置錯誤';
             }
         } catch (error) {
             console.error("Firebase 初始化失敗:", error);
             document.getElementById('loading-message').textContent = '錯誤: Firebase 初始化失敗。';
+            submitBtn.textContent = '初始化失敗';
         }
 
         // 費用計算輔助函式
@@ -309,7 +319,8 @@
 
         // 提交報名表單
         window.submitRegistration = async () => {
-            if (!db || !auth.currentUser) {
+            // 在提交時再次檢查認證狀態
+            if (!auth.currentUser) {
                 displayMessage('系統正在初始化，請稍候再試。', true);
                 return;
             }
@@ -337,9 +348,9 @@
                 userId: userId // 記錄報名者的用戶ID (匿名或自訂)
             };
 
-            const submitBtn = document.getElementById('submit-btn');
             submitBtn.disabled = true;
             submitBtn.textContent = '送出中...';
+            submitBtn.className = 'w-full py-3 px-4 bg-yellow-500 text-white text-2xl font-bold rounded-xl shadow-lg transition duration-200'; // 變色提醒用戶等待
 
             try {
                 await addDoc(collection(db, collectionPath), registrationData);
@@ -355,8 +366,17 @@
                 console.error("寫入 Firestore 錯誤: ", e);
                 displayMessage('❌ 報名失敗，請檢查網路連線或聯繫主辦人。', true);
             } finally {
-                submitBtn.disabled = false;
-                submitBtn.textContent = '送出報名';
+                // 恢復按鈕狀態，只有在認證成功後才能變綠色
+                if (auth.currentUser) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '送出報名';
+                    submitBtn.className = 'w-full py-3 px-4 bg-green-500 text-white text-2xl font-bold rounded-xl shadow-lg hover:bg-green-600 transition duration-200 transform hover:scale-[1.01] active:scale-95';
+                } else {
+                    // 如果認證狀態跑掉，讓它繼續顯示初始化中，防止二次錯誤
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = '系統初始化中...';
+                    submitBtn.className = 'w-full py-3 px-4 bg-gray-400 text-white text-2xl font-bold rounded-xl shadow-lg transition duration-200';
+                }
             }
         };
     </script>
