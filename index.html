@@ -123,6 +123,23 @@
         </div>
 
     </div>
+    
+    <!-- 管理員刪除確認區塊 (隱藏的簡易密碼模態) -->
+    <div id="admin-prompt" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm space-y-4">
+            <h3 class="text-xl font-bold text-red-600">請輸入管理員密碼</h3>
+            <p id="prompt-message" class="text-gray-700">您確定要刪除 [姓名] 的報名資料嗎？</p>
+            <input type="password" id="admin-password" placeholder="請輸入三位數密碼 (888)" class="input-field text-center" maxlength="3">
+            <div class="flex space-x-3">
+                <button onclick="checkAdminPassword()" class="flex-1 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition">
+                    確認刪除
+                </button>
+                <button onclick="hideAdminPrompt()" class="flex-1 py-2 bg-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-400 transition">
+                    取消
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- Firebase 腳本 -->
     <script type="module">
@@ -135,6 +152,11 @@
         let db;
         let auth;
         let userId = 'anonymous';
+        
+        // 刪除功能所需的全局變數
+        let docIdToDelete = null; 
+        let nameToDelete = null;
+        const ADMIN_PASSWORD = '888';
 
         // === 這是您正式專案的 Firebase 配置 (已內嵌您提供的金鑰) ===
         const firebaseConfig = {
@@ -386,22 +408,59 @@
             }
         };
 
-        // 管理員刪除報名功能
-        window.deleteRegistration = async (docId, name) => {
+        // --- 密碼確認模態函數 ---
+        
+        function showAdminPrompt(docId, name) {
+            docIdToDelete = docId;
+            nameToDelete = name;
+            document.getElementById('prompt-message').textContent = `您確定要刪除 ${name} 的報名資料嗎？`;
+            document.getElementById('admin-password').value = ''; // 清空密碼
+            document.getElementById('admin-prompt').classList.remove('hidden');
+        }
+
+        window.hideAdminPrompt = () => {
+            docIdToDelete = null;
+            nameToDelete = null;
+            document.getElementById('admin-prompt').classList.add('hidden');
+        }
+
+        window.checkAdminPassword = async () => {
+            const password = document.getElementById('admin-password').value.trim();
+            
+            if (password === ADMIN_PASSWORD) {
+                hideAdminPrompt();
+                await executeDeleteRegistration(docIdToDelete, nameToDelete);
+            } else {
+                displayMessage('❌ 管理員密碼錯誤！請重新輸入。', true);
+                document.getElementById('admin-password').value = '';
+            }
+        }
+
+        // 實際執行刪除的函數
+        async function executeDeleteRegistration(docId, name) {
             if (!auth.currentUser) {
                 displayMessage('刪除失敗: 權限不足或系統尚未完成初始化。', true);
                 return;
             }
 
-            // 在此處加入一個快速的單擊刪除機制，並使用顯示訊息替代 alert/confirm。
             try {
                 const docRef = doc(db, collectionPath, docId);
                 await deleteDoc(docRef);
-                displayMessage(`已成功刪除 ${name} 的報名資料。`, false);
+                displayMessage(`✅ 已成功刪除 ${name} 的報名資料。`, false);
             } catch (e) {
                 console.error("刪除 Firestore 錯誤: ", e);
                 displayMessage(`❌ 刪除 ${name} 的報名資料失敗: ${e.message}。請確認您的 Firestore 規則已正確設定。`, true);
             }
+        }
+        
+        // 管理員刪除報名功能 (現在只負責打開密碼確認視窗)
+        window.deleteRegistration = (docId, name) => {
+             // 必須先完成認證才能打開視窗
+             if (!auth.currentUser) {
+                displayMessage('刪除失敗: 系統尚未完成初始化，請稍候。', true);
+                return;
+            }
+            showAdminPrompt(docId, name);
         };
     </script>
 </body>
