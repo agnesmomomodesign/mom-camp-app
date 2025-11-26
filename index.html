@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>露營活動報名表</title>
+    <!-- 載入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 設定字體為 Inter，並為中文設定通用字體 -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+            background-color: #f7f7f7;
+        }
+        .form-label {
+            font-size: 1.5rem; /* 大字體 */
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #1f2937; /* 深色文字 */
+        }
+        .input-field {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            border: 2px solid #d1d5db;
+            width: 100%;
+            font-size: 1.25rem;
+            transition: all 0.2s;
+        }
+        .input-field:focus {
+            border-color: #3b82f6;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+        }
+        .registration-item {
+            padding: 1.5rem;
+            border-bottom: 1px solid #e5e7eb;
+            background-color: white;
+            transition: all 0.3s;
+        }
+        .registration-item:hover {
+            background-color: #f3f4f6;
+        }
+        .fee-undefined {
+            color: #ef4444; /* red-500 */
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+    <div id="app" class="max-w-4xl mx-auto space-y-8">
+        
+        <!-- 應用程式標題與說明 -->
+        <header class="text-center space-y-2">
+            <h1 class="text-4xl sm:text-5xl font-extrabold text-blue-700">11/28~30 細湖頂露營報名</h1>
+            <p class="text-xl font-bold text-red-600">限量40車</p> 
+            <p class="text-base text-gray-600">請填寫以下資訊，完成報名。</p>
+            <p class="text-xs text-gray-400">用戶ID: <span id="user-id">讀取中...</span></p>
+        </header>
+
+        <!-- 報名表單區塊 -->
+        <div id="registration-form" class="bg-white p-6 sm:p-8 rounded-xl shadow-2xl space-y-6 border-t-8 border-blue-500">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">填寫報名資料</h2>
+
+            <!-- 1. 姓名 -->
+            <div>
+                <label for="name" class="form-label">1. 姓名</label>
+                <input type="text" id="name" placeholder="請輸入報名者姓名" class="input-field" required>
+            </div>
+
+            <!-- 2. 隨行車輛數 (已修改為 '2. 幾車') -->
+            <div>
+                <label for="cars" class="form-label">2. 幾車</label>
+                <input type="number" id="cars" value="1" min="0" class="input-field" required>
+            </div>
+
+            <!-- 3. 參加總人數 -->
+            <div>
+                <label for="people" class="form-label">3. 參加總人數 (人)</label>
+                <input type="number" id="people" value="1" min="1" class="input-field" required>
+            </div>
+            
+            <!-- 4. 抵達日期與住宿選擇 -->
+            <div class="space-y-4">
+                <p class="form-label">4. 選擇抵達日期與過夜晚數</p>
+                <div id="arrival-options" class="space-y-3">
+                    
+                    <!-- 選項 1: 11/28 抵達, 2 晚 -->
+                    <label class="flex items-center p-4 bg-blue-50 border-2 border-blue-200 rounded-lg cursor-pointer hover:bg-blue-100 transition duration-150">
+                        <input type="radio" name="arrival" value="2025-11-28_2" class="w-6 h-6 text-blue-600 focus:ring-blue-500" required>
+                        <span class="ml-4 text-xl font-medium text-gray-800">11月28日抵達 (共住 2 晚)</span>
+                    </label>
+
+                    <!-- 選項 2: 11/29 抵達, 1 晚 -->
+                    <label class="flex items-center p-4 bg-blue-50 border-2 border-blue-200 rounded-lg cursor-pointer hover:bg-blue-100 transition duration-150">
+                        <input type="radio" name="arrival" value="2025-11-29_1" class="w-6 h-6 text-blue-600 focus:ring-blue-500">
+                        <span class="ml-4 text-xl font-medium text-gray-800">11月29日抵達 (共住 1 晚)</span>
+                    </label>
+
+                </div>
+            </div>
+
+            <!-- 提交按鈕 -->
+            <button id="submit-btn" onclick="submitRegistration()" class="w-full py-3 px-4 bg-green-500 text-white text-2xl font-bold rounded-xl shadow-lg hover:bg-green-600 transition duration-200 transform hover:scale-[1.01] active:scale-95">
+                送出報名
+            </button>
+            <div id="message" class="text-center mt-4 text-lg font-medium" style="display: none;"></div>
+        </div>
+
+        <!-- 報名清單區塊 (供主辦人查看) -->
+        <div id="registration-list-section" class="pt-8 space-y-4">
+            <h2 class="text-3xl font-bold text-gray-800">目前報名清單 (即時更新)</h2>
+            <div id="totals" class="bg-yellow-50 p-4 rounded-lg shadow font-semibold text-lg flex flex-wrap justify-between">
+                <p>總人數: <span id="total-people" class="text-red-600">0</span> 人</p>
+                <p>總車輛數: <span id="total-cars" class="text-red-600">0</span> 台</p>
+                <p>總計費用: <span id="total-fee" class="text-green-700 text-2xl font-extrabold">0</span> 元</p>
+            </div>
+            <div id="registrations-container" class="bg-white rounded-xl shadow-lg divide-y divide-gray-200">
+                <!-- 報名資料將載入於此 -->
+                <p class="p-6 text-center text-gray-500" id="loading-message">載入報名資料中...</p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Firebase 腳本 -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // 設定 Firebase 全域變數
+        let app;
+        let db;
+        let auth;
+        let userId = 'anonymous';
+
+        // === 這是您正式專案的 Firebase 配置 (已內嵌您提供的金鑰) ===
+        const firebaseConfig = {
+          apiKey: "AIzaSyCdSqtWof1b7S-vbJF_0p9BLOqOoTkhORg",
+          authDomain: "momcamping-64987.firebaseapp.com",
+          projectId: "momcamping-64987",
+          storageBucket: "momcamping-64987.firebasestorage.app",
+          messagingSenderId: "1029815892072",
+          appId: "1:1029815892072:web:a88df6a358db5d31f0e3dd"
+        };
+        
+        // Firestore 集合路徑 (使用您的 projectId 作為 appId)
+        const appId = firebaseConfig.projectId;
+        const collectionPath = `/artifacts/${appId}/public/data/camp_registrations`;
+
+
+        // 輔助函式：顯示訊息
+        function displayMessage(text, isError = false) {
+            const messageElement = document.getElementById('message');
+            messageElement.textContent = text;
+            messageElement.style.display = 'block';
+            messageElement.className = `text-center mt-4 text-lg font-medium p-3 rounded-lg ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`;
+            setTimeout(() => {
+                messageElement.style.display = 'none';
+            }, 5000);
+        }
+
+        // 初始化 Firebase
+        try {
+            if (Object.keys(firebaseConfig).length > 0) {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                setLogLevel('Debug'); // 啟用 Firebase 偵錯日誌
+
+                // 處理認證
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        document.getElementById('user-id').textContent = userId;
+                        // 認證完成，開始監聽資料庫
+                        setupRealtimeListener();
+                    } else {
+                        // 在正式部署環境中，如果沒有用戶，就直接使用匿名登入
+                        await signInAnonymously(auth);
+                    }
+                });
+
+            } else {
+                console.error("錯誤：Firebase 配置遺失。請檢查您的 index.html 是否包含正確的金鑰。");
+                document.getElementById('loading-message').textContent = '錯誤: Firebase 配置遺失，無法載入資料。';
+            }
+        } catch (error) {
+            console.error("Firebase 初始化失敗:", error);
+            document.getElementById('loading-message').textContent = '錯誤: Firebase 初始化失敗。';
+        }
+
+        // 費用計算輔助函式
+        function calculateFee(people, nights) {
+            // 規則: 1車2人
+            if (people === 2) {
+                if (nights === 1) return 500;
+                if (nights === 2) return 750;
+            }
+            // 規則: 1車1人
+            else if (people === 1) {
+                if (nights === 1) return 400;
+                if (nights === 2) return 600;
+            }
+            // 規則未定義 (例如 0人, 3人以上, 3晚以上)
+            return 0; 
+        }
+
+        // 設置即時資料監聽器
+        function setupRealtimeListener() {
+            if (!db) return;
+
+            // 輔助函式：將 Firebase Timestamp 格式化為易讀的 YYYY/MM/DD HH:MM
+            const formatTimestamp = (timestamp) => {
+                if (!timestamp) return 'N/A';
+                const date = timestamp.toDate();
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                // 為了簡潔，不顯示秒數
+                return `${year}/${month}/${day} ${hours}:${minutes}`;
+            };
+
+
+            const q = query(collection(db, collectionPath));
+            const container = document.getElementById('registrations-container');
+            const loadingMsg = document.getElementById('loading-message');
+
+            onSnapshot(q, (snapshot) => {
+                const registrations = [];
+                let totalPeople = 0;
+                let totalCars = 0;
+                let totalFee = 0; 
+
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    
+                    // 計算單筆費用
+                    const fee = calculateFee(data.people, data.nights);
+                    totalFee += fee;
+                    data.calculatedFee = fee; // 儲存計算結果以便顯示
+
+                    registrations.push({ id: doc.id, ...data });
+                    
+                    // 計算總數
+                    totalPeople += data.people || 0;
+                    totalCars += data.cars || 0;
+                });
+                
+                // 排序：按報名時間「升序」排列 (最早的在最上面)
+                registrations.sort((a, b) => (a.timestamp?.toDate() || 0) - (b.timestamp?.toDate() || 0));
+
+                // 更新總計數字
+                document.getElementById('total-people').textContent = totalPeople;
+                document.getElementById('total-cars').textContent = totalCars;
+                document.getElementById('total-fee').textContent = totalFee.toLocaleString('zh-TW'); // 格式化為千位數
+
+
+                // 渲染清單
+                container.innerHTML = '';
+                if (registrations.length === 0) {
+                    container.innerHTML = '<p class="p-6 text-center text-gray-500">目前還沒有人報名，快來成為第一個吧！</p>';
+                } else {
+                    // 新增 index (編號)
+                    registrations.forEach((reg, index) => {
+                        const arrivalDateText = reg.arrivalDate.split('_')[0]; 
+                        const nightsText = reg.nights; 
+                        const formattedTime = formatTimestamp(reg.timestamp); 
+                        const sequenceNumber = index + 1; // 編號從 1 開始
+
+                        // 判斷是否為未定義費用
+                        const feeDisplay = reg.calculatedFee > 0 
+                            ? `<span class="text-green-700 font-bold">${reg.calculatedFee.toLocaleString('zh-TW')} 元</span>`
+                            : `<span class="fee-undefined">0 元 (規則未定義)</span>`;
+
+                        const itemHtml = `
+                            <div class="registration-item flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                                <!-- 新增編號 -->
+                                <div class="hidden sm:block text-3xl font-extrabold text-red-500 mr-4">${sequenceNumber}.</div>
+
+                                <div class="mb-2 sm:mb-0 flex-grow">
+                                    <p class="text-xl font-bold text-gray-900"><span class="sm:hidden text-2xl font-extrabold text-red-500 mr-2">${sequenceNumber}.</span>${reg.name}</p>
+                                    <!-- 報名時間 -->
+                                    <p class="text-base text-gray-600 font-normal mt-1">報名時間: <span class="text-blue-700 font-medium">${formattedTime}</span></p>
+                                </div>
+                                
+                                <div class="flex flex-col sm:flex-row sm:space-x-8 text-lg font-medium text-gray-700 mt-2 sm:mt-0">
+                                    <p>人數/車輛: <span class="text-blue-600">${reg.people} 人 / ${reg.cars} 車</span></p>
+                                    <p>抵達日: <span class="text-blue-600">${arrivalDateText.substring(5).replace('-', '/')}</span> (${nightsText} 晚)</p>
+                                    <p>費用: ${feeDisplay}</p>
+                                </div>
+                            </div>
+                        `;
+                        container.insertAdjacentHTML('beforeend', itemHtml);
+                    });
+                }
+                
+                if (loadingMsg) loadingMsg.style.display = 'none';
+
+            }, (error) => {
+                console.error("即時資料監聽失敗:", error);
+                container.innerHTML = `<p class="p-6 text-center text-red-500">錯誤: 資料讀取失敗 (${error.message})</p>`;
+            });
+        }
+
+        // 提交報名表單
+        window.submitRegistration = async () => {
+            if (!db || !auth.currentUser) {
+                displayMessage('系統正在初始化，請稍候再試。', true);
+                return;
+            }
+
+            const name = document.getElementById('name').value.trim();
+            const cars = parseInt(document.getElementById('cars').value, 10);
+            const people = parseInt(document.getElementById('people').value, 10);
+            const arrivalOption = document.querySelector('input[name="arrival"]:checked');
+
+            if (!name || isNaN(cars) || isNaN(people) || people <= 0 || !arrivalOption) {
+                displayMessage('請檢查所有欄位是否都正確填寫，人數必須大於 0。', true);
+                return;
+            }
+
+            const [arrivalDate, nightsStr] = arrivalOption.value.split('_');
+            const nights = parseInt(nightsStr, 10);
+
+            const registrationData = {
+                name: name,
+                cars: cars,
+                people: people,
+                arrivalDate: arrivalDate,
+                nights: nights,
+                timestamp: new Date(),
+                userId: userId // 記錄報名者的用戶ID (匿名或自訂)
+            };
+
+            const submitBtn = document.getElementById('submit-btn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = '送出中...';
+
+            try {
+                await addDoc(collection(db, collectionPath), registrationData);
+                displayMessage('🎉 報名成功！感謝您的參與。');
+                
+                // 清空表單
+                document.getElementById('name').value = '';
+                document.getElementById('cars').value = '1';
+                document.getElementById('people').value = '1';
+                document.querySelectorAll('input[name="arrival"]').forEach(radio => radio.checked = false);
+
+            } catch (e) {
+                console.error("寫入 Firestore 錯誤: ", e);
+                displayMessage('❌ 報名失敗，請檢查網路連線或聯繫主辦人。', true);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '送出報名';
+            }
+        };
+    </script>
+</body>
+</html>
